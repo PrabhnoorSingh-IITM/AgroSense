@@ -1,0 +1,148 @@
+from flask import Flask, request, jsonify, render_template
+from flask_cors import CORS # Import CORS
+import json
+import pyrebase
+from twilio.rest import Client
+import time
+import threading
+import sys
+
+app = Flask(__name__)
+# IMPORTANT: Enable CORS to allow your HTML file to call this server
+CORS(app) 
+
+firebaseConfig = {
+    "apiKey": "AIzaSyDLo9IsiIVdIMZlQqz8JEVhRrUZt5BHAQw",
+    "authDomain": "agrosense-e00de.firebaseapp.com",
+    "databaseURL": "https://agrosense-e00de-default-rtdb.firebaseio.com",
+    "storageBucket": "agrosense-e00de.firebasestorage.app",
+    "projectId": "agrosense-e00de",
+}
+
+TWILIO_ACCOUNT_SID = ""#ADD IT
+TWILIO_AUTH_TOKEN = ""#ADD IT
+TWILIO_NUMBER = "+13183539468"
+FARMER_PHONE_NUMBER = "+918527712984"  #Farmers No
+
+# Initialize Firebase
+try:
+    firebase = pyrebase.initialize_app(firebaseConfig)
+    db = firebase.database()
+    print("Backend Server: Successfully connected to Firebase.")
+except Exception as e:
+    print(f"ERROR: Backend could not connect to Firebase. Check config. \nDetails: {e}")
+    sys.exit(1)
+
+# Initialize Twilio
+try:
+    twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+    # Test credentials
+    twilio_client.api.accounts(TWILIO_ACCOUNT_SID).fetch()
+    print("Backend Server: Successfully connected to Twilio.")
+except Exception as e:
+    print(f"ERROR: Backend could not connect to Twilio. Check SID/Token. \nDetails: {e}")
+    # We don't exit, as the AI diagnosis can still work
+    
+
+
+# --- 3. AI DIAGNOSIS ENDPOINT ---
+@app.route('/diagnose', methods=['POST'])
+def diagnose_image():
+    if 'image' not in request.files:
+        return jsonify({"error": "No image file provided"}), 400
+
+    image_file = request.files['image']
+    
+    # *HACKATHON MOCKUP LOGIC (Based on filename)*
+    filename = image_file.filename.lower()
+    print(f"Received image: {filename}")
+
+    if "healthy" in filename or "control" in filename:
+        diagnosis = "Healthy Crop"
+        recommendation = "Maintain current conditions. Keep soil moisture above 25%."
+        model_confidence = "99.1%"
+    else:
+        # PULL SENSOR DATA FOR A *SMARTER* DIAGNOSIS
+        try:
+            sensor_data = db.child("sensors/agrosense").get().val()
+            humidity = sensor_data.get("air_humidity", 70) # Default 70%
+        except Exception as e:
+            print(f"SmartDiagnosis Error: Could not get sensor data. {e}")
+            humidity = 70 # Default if Firebase fails
+        
+        if humidity > 80:
+             diagnosis = "Powdery Mildew (High Risk)"
+             recommendation = f"Our sensors show humidity is {humidity}%, which is very high. 1. Apply fungicide immediately. 2. Increase air circulation to prevent future outbreaks."
+             model_confidence = "97.8%"
+        else:
+            diagnosis = "Common Leaf Spot"
+            recommendation = "This is a minor fungal issue. Apply a copper-based fungicide. Your humidity levels appear normal."
+            model_cnfidence = "94.2%"
+
+    return jsonify({
+        "status": "success",
+        "diagnosis": diagnosis,
+        "recommendation": recommendation,
+        "model_confidence": model_confidence
+    })
+
+
+# --- 4. CRITICAL ALERT LISTENER (Twilio SMS Alert) ---
+def listen_for_alerts():
+    """Listens to Firebase for alert flags and sensor data."""
+    
+    last_alert_time = 0
+    ALERT_COOLDOWN_SECONDS = 300 # 5 minutes
+
+    def stream_handler(message):
+        nonlocal last_alert_time
+        
+        # This logic handles both initial load (message['data'] is a dict) and updates
+        trigger_val = 0
+        try:
+            if message['path'] == "/" and message['data'] is not None:
+                 trigger_val = message['data'].get("trigger", 0)
+            elif message['path'] == "/trigger":
+                 trigger_val = message['data']
+        except Exception as e:
+            print(f"Stream Error: {e}")
+            return
+        
+        if trigger_val == 1 and (time.time() - last_alert_time) > ALERT_COOLDOWN_SECONDS:
+            
+            print("\n[ALERT] Soil Moisture Trigger Detected. Sending SMS...")
+            
+            # --- TWILIO SEND SMS ---
+            try:
+                sms = twilio_client.messages.create(
+                    to=FARMER_PHONE_NUMBER, 
+                    from_=TWILIO_NUMBER, 
+                    body="🚨 URGENT! AgroSense Alert: Soil in Field 1 is critically DRY (below 20%). Irrigate immediately!"
+                )
+                print(f"SMS Sent successfully. SID: {sms.sid}")
+                last_alert_time = time.time()
+                
+                # --- Send "Pump On" command ---
+                db.child("actuators").child("water_pump_1").set(1)
+                print("Successfully sent 'PUMP_ON' command to Firebase.")
+                
+            except Exception as e:
+                print(f"TWILIO/Firebase ERROR: Could not send SMS or pump command. {e}")
+                print("Please check Twilio credentials and FARMER_PHONE_NUMBER.")
+        
+    try:
+        db.child("alerts").stream(stream_handler)
+    except Exception as e:
+        print(f"FATAL: Could not connect to Firebase Stream. {e}")
+
+
+if __name__ == '__main__':
+    listener_thread = threading.Thread(target=listen_for_alerts, daemon=True)
+    listener_thread.start()
+    
+    print("------------------------------------------")
+    print("  AgroSense Backend Server Running...     ")
+    print("  Listening for API calls on port 5000  ")
+    print("  Listening to Firebase for alerts...   ")
+    print("------------------------------------------")
+    app.run(host='0.0.0.0', port=5000, debug=False)
