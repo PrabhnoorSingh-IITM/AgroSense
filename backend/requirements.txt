@@ -1,0 +1,5 @@
+Flask
+pyrebase4
+twilio
+requests
+flask-cors
