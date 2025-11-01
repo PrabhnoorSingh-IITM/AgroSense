@@ -1,190 +1,148 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-from config import Config
-from models import db, User, SensorData
-from werkzeug.security import generate_password_hash, check_password_hash
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
-import time
-
-# Twilio SMS Support
+from flask import Flask, request, jsonify, render_template
+from flask_cors import CORS # Import CORS
+import json
+import pyrebase
 from twilio.rest import Client
-import os
+import time
+import threading
+import sys
 
-def send_sms_alert(phone, message):
-    try:
-        account_sid = os.getenv("TWILIO_ACCOUNT_SID")
-        auth_token = os.getenv("TWILIO_AUTH_TOKEN")
-        twilio_number = os.getenv("TWILIO_PHONE_NUMBER")
-        client = Client(account_sid, auth_token)
-        client.messages.create(
-            body=message,
-            from_=twilio_number,
-            to=phone
-        )
-        print(f"SMS sent to {phone}")
-    except Exception as e:
-        print(f"SMS failed: {e}")
+app = Flask(__name__)
+# IMPORTANT: Enable CORS to allow your HTML file to call this server
+CORS(app) 
+
+firebaseConfig = {
+    "apiKey": "AIzaSyDLo9IsiIVdIMZlQqz8JEVhRrUZt5BHAQw",
+    "authDomain": "agrosense-e00de.firebaseapp.com",
+    "databaseURL": "https://agrosense-e00de-default-rtdb.firebaseio.com",
+    "storageBucket": "agrosense-e00de.firebasestorage.app",
+    "projectId": "agrosense-e00de",
+}
+
+TWILIO_ACCOUNT_SID = ""#ADD IT
+TWILIO_AUTH_TOKEN = ""#ADD IT
+TWILIO_NUMBER = "+13183539468"
+FARMER_PHONE_NUMBER = "+918527712984"  #Farmers No
+
+# Initialize Firebase
+try:
+    firebase = pyrebase.initialize_app(firebaseConfig)
+    db = firebase.database()
+    print("Backend Server: Successfully connected to Firebase.")
+except Exception as e:
+    print(f"ERROR: Backend could not connect to Firebase. Check config. \nDetails: {e}")
+    sys.exit(1)
+
+# Initialize Twilio
+try:
+    twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+    # Test credentials
+    twilio_client.api.accounts(TWILIO_ACCOUNT_SID).fetch()
+    print("Backend Server: Successfully connected to Twilio.")
+except Exception as e:
+    print(f"ERROR: Backend could not connect to Twilio. Check SID/Token. \nDetails: {e}")
+    # We don't exit, as the AI diagnosis can still work
+    
 
 
-def create_app():
-    app = Flask(__name__)
-    app.config.from_object(Config)
-    CORS(app)
-    db.init_app(app)
-    jwt = JWTManager(app)
+# --- 3. AI DIAGNOSIS ENDPOINT ---
+@app.route('/diagnose', methods=['POST'])
+def diagnose_image():
+    if 'image' not in request.files:
+        return jsonify({"error": "No image file provided"}), 400
 
-    @app.before_first_request
-    def create_tables():
-        db.create_all()
+    image_file = request.files['image']
+    
+    # *HACKATHON MOCKUP LOGIC (Based on filename)*
+    filename = image_file.filename.lower()
+    print(f"Received image: {filename}")
 
-    # register
-    @app.route('/api/register', methods=['POST'])
-    def register():
-        data = request.get_json()
-        name = data.get('name')
-        email = data.get('email')
-        password = data.get('password')
-        if not name or not email or not password:
-            return jsonify({'msg':'missing fields'}), 400
-        if User.query.filter_by(email=email).first():
-            return jsonify({'msg':'email exists'}), 400
-        user = User(full_name=name, email=email, password_hash=generate_password_hash(password))
-        db.session.add(user); db.session.commit()
-        return jsonify({'msg':'ok'}), 201
-
-    # login
-    @app.route('/api/login', methods=['POST'])
-    def login():
-        data = request.get_json()
-        email = data.get('email'); password = data.get('password')
-        if not email or not password:
-            return jsonify({'msg':'missing'}), 400
-        user = User.query.filter_by(email=email).first()
-        if not user or not check_password_hash(user.password_hash, password):
-            return jsonify({'msg':'invalid'}, 401)
-        access = create_access_token(identity=user.id)
-        return jsonify({'access_token': access, 'user': {'id': user.id, 'email': user.email, 'name': user.full_name}})
-
-    # device pushes sensor data: allow device by API key in header or user-provided token
-    @app.route('/api/device_data', methods=['POST'])
-    def device_data():
-        api_key = request.headers.get('X-Device-Key') or request.args.get('api_key')
-        if api_key != Config.DEVICE_API_KEY:
-            return jsonify({'msg':'unauthorized device'}), 401
-        payload = request.get_json() or {}
-        # accept optional 'user_email' to attach readings to a user
-        email = payload.get('user_email')
-        user = None
-        if email:
-            user = User.query.filter_by(email=email).first()
-        sd = SensorData(
-            user_id = user.id if user else None,
-            air_temp = payload.get('air_temp'),
-            air_humidity = payload.get('air_humidity'),
-            soil_moisture = payload.get('soil_moisture'),
-            timestamp = payload.get('timestamp') or int(time.time())
-        )
-        db.session.add(sd); db.session.commit()
-        return jsonify({'msg':'ok'}), 201
-
-    # save data (authenticated user)
-    @app.route('/api/save_data', methods=['POST'])
-    @jwt_required()
-    def save_data():
-        uid = get_jwt_identity()
-        user = User.query.get(uid)
-        if not user:
-            return jsonify({'msg':'user not found'}), 404
-        payload = request.get_json() or {}
-        sd = SensorData(
-            user_id = user.id,
-            air_temp = payload.get('air_temp'),
-            air_humidity = payload.get('air_humidity'),
-            soil_moisture = payload.get('soil_moisture'),
-            timestamp = payload.get('timestamp') or int(time.time())
-        )
-        db.session.add(sd); db.session.commit()
-        return jsonify({'msg':'ok'}), 201
-
-    # get latest reading for token or global latest
-    @app.route('/api/latest', methods=['GET'])
-    def latest():
-        token = None
-        header = request.headers.get('Authorization')
-        # if JWT present return user-scoped latest
-        if header and header.startswith('Bearer '):
-            # delegate to jwt_required via simple attempt
-            try:
-                from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
-                verify_jwt_in_request()
-                uid = get_jwt_identity()
-                sd = SensorData.query.filter_by(user_id=uid).order_by(SensorData.timestamp.desc()).first()
-                if sd:
-                    return jsonify({'data': {
-                        'air_temp': sd.air_temp,
-                        'air_humidity': sd.air_humidity,
-                        'soil_moisture': sd.soil_moisture,
-                        'timestamp': sd.timestamp
-                    }})
-            except Exception:
-                pass
-        # otherwise return last global reading
-        sd = SensorData.query.order_by(SensorData.timestamp.desc()).first()
-        if not sd:
-            return jsonify({'data': {}}), 200
-        return jsonify({'data': {
-            'air_temp': sd.air_temp,
-            'air_humidity': sd.air_humidity,
-            'soil_moisture': sd.soil_moisture,
-            'timestamp': sd.timestamp
-        }})
-
-    # history (optionally user-scoped)
-    @app.route('/api/history', methods=['GET'])
-    def history():
-        limit = int(request.args.get('limit', 50))
-        header = request.headers.get('Authorization')
-        q = SensorData.query
-        if header and header.startswith('Bearer '):
-            try:
-                from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
-                verify_jwt_in_request()
-                uid = get_jwt_identity()
-                q = q.filter_by(user_id=uid)
-            except Exception:
-                pass
-        rows = q.order_by(SensorData.timestamp.desc()).limit(limit).all()
-        out = []
-        for r in rows[::-1]:
-            out.append({'air_temp': r.air_temp, 'air_humidity': r.air_humidity, 'soil_moisture': r.soil_moisture, 'timestamp': r.timestamp})
-        return jsonify({'data': out})
-
-    # simple health
-    @app.route('/api/ping', methods=['GET'])
-    def ping():
-        return jsonify({'msg':'ok'})
-
-    # AI diagnose endpoint placeholder (keeps your existing behavior)
-    @app.route('/diagnose', methods=['POST'])
-    def diagnose():
-        if 'image' not in request.files:
-            return jsonify({'error':'no image'}), 400
-        f = request.files['image']
-        name = f.filename.lower()
-        # reuse earlier simple logic
-        if "healthy" in name:
-            return jsonify({'status':'success','diagnosis':'Healthy Crop','recommendation':'Maintain conditions','model_confidence':'99.1%'})
-        # fallback
-        # check latest humidity to add context
-        sd = SensorData.query.order_by(SensorData.timestamp.desc()).first()
-        humidity = sd.air_humidity if sd else 70
+    if "healthy" in filename or "control" in filename:
+        diagnosis = "Healthy Crop"
+        recommendation = "Maintain current conditions. Keep soil moisture above 25%."
+        model_confidence = "99.1%"
+    else:
+        # PULL SENSOR DATA FOR A *SMARTER* DIAGNOSIS
+        try:
+            sensor_data = db.child("sensors/agrosense").get().val()
+            humidity = sensor_data.get("air_humidity", 70) # Default 70%
+        except Exception as e:
+            print(f"SmartDiagnosis Error: Could not get sensor data. {e}")
+            humidity = 70 # Default if Firebase fails
+        
         if humidity > 80:
-            return jsonify({'status':'success','diagnosis':'Powdery Mildew (High Risk)','recommendation':'Apply fungicide; increase ventilation','model_confidence':'97.8%'})
+             diagnosis = "Powdery Mildew (High Risk)"
+             recommendation = f"Our sensors show humidity is {humidity}%, which is very high. 1. Apply fungicide immediately. 2. Increase air circulation to prevent future outbreaks."
+             model_confidence = "97.8%"
         else:
-            return jsonify({'status':'success','diagnosis':'Common Leaf Spot','recommendation':'Copper fungicide','model_confidence':'94.2%'})
+            diagnosis = "Common Leaf Spot"
+            recommendation = "This is a minor fungal issue. Apply a copper-based fungicide. Your humidity levels appear normal."
+            model_cnfidence = "94.2%"
 
-    return app
+    return jsonify({
+        "status": "success",
+        "diagnosis": diagnosis,
+        "recommendation": recommendation,
+        "model_confidence": model_confidence
+    })
+
+
+# --- 4. CRITICAL ALERT LISTENER (Twilio SMS Alert) ---
+def listen_for_alerts():
+    """Listens to Firebase for alert flags and sensor data."""
+    
+    last_alert_time = 0
+    ALERT_COOLDOWN_SECONDS = 300 # 5 minutes
+
+    def stream_handler(message):
+        nonlocal last_alert_time
+        
+        # This logic handles both initial load (message['data'] is a dict) and updates
+        trigger_val = 0
+        try:
+            if message['path'] == "/" and message['data'] is not None:
+                 trigger_val = message['data'].get("trigger", 0)
+            elif message['path'] == "/trigger":
+                 trigger_val = message['data']
+        except Exception as e:
+            print(f"Stream Error: {e}")
+            return
+        
+        if trigger_val == 1 and (time.time() - last_alert_time) > ALERT_COOLDOWN_SECONDS:
+            
+            print("\n[ALERT] Soil Moisture Trigger Detected. Sending SMS...")
+            
+            # --- TWILIO SEND SMS ---
+            try:
+                sms = twilio_client.messages.create(
+                    to=FARMER_PHONE_NUMBER, 
+                    from_=TWILIO_NUMBER, 
+                    body="🚨 URGENT! AgroSense Alert: Soil in Field 1 is critically DRY (below 20%). Irrigate immediately!"
+                )
+                print(f"SMS Sent successfully. SID: {sms.sid}")
+                last_alert_time = time.time()
+                
+                # --- Send "Pump On" command ---
+                db.child("actuators").child("water_pump_1").set(1)
+                print("Successfully sent 'PUMP_ON' command to Firebase.")
+                
+            except Exception as e:
+                print(f"TWILIO/Firebase ERROR: Could not send SMS or pump command. {e}")
+                print("Please check Twilio credentials and FARMER_PHONE_NUMBER.")
+        
+    try:
+        db.child("alerts").stream(stream_handler)
+    except Exception as e:
+        print(f"FATAL: Could not connect to Firebase Stream. {e}")
+
 
 if __name__ == '__main__':
-    app = create_app()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    listener_thread = threading.Thread(target=listen_for_alerts, daemon=True)
+    listener_thread.start()
+    
+    print("------------------------------------------")
+    print("  AgroSense Backend Server Running...     ")
+    print("  Listening for API calls on port 5000  ")
+    print("  Listening to Firebase for alerts...   ")
+    print("------------------------------------------")
+    app.run(host='0.0.0.0', port=5000, debug=False)
