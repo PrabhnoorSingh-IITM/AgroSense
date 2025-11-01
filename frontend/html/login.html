@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AgroSense — Login</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <main class="auth-page">
+    <div class="card auth-card">
+      <h1>AgroSense</h1>
+      <p>Login to your farmer dashboard</p>
+
+      <label>Email</label>
+      <input id="email" type="email" placeholder="you@example.com" />
+
+      <label>Password</label>
+      <input id="password" type="password" placeholder="password" />
+
+      <button id="loginBtn">Log in</button>
+
+      <p class="muted">Or <a href="dashboard.html" id="demoLink">continue as demo</a></p>
+
+      <hr/>
+      <p>Don't have an account? <a href="#" id="showRegister">Register</a></p>
+
+      <div id="registerArea" class="hidden">
+        <label>Full name</label>
+        <input id="reg_name" type="text" placeholder="Your name" />
+        <label>Email</label>
+        <input id="reg_email" type="email" placeholder="you@example.com" />
+        <label>Password</label>
+        <input id="reg_password" type="password" placeholder="password" />
+        <button id="registerBtn">Register</button>
+      </div>
+
+      <div id="message" class="muted"></div>
+    </div>
+  </main>
+
+  <script src="js/login.js"></script>
+</body>
+</html>
