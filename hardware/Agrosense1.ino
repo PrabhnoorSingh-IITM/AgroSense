@@ -27,7 +27,7 @@
 #define WIFI_SSID       "Sidhu_1"
 #define WIFI_PASSWORD   "Catapult@12"
 
-// Firebase Project Configuration
+// ☁️Firebase Project Configuration
 #define FIREBASE_HOST   "agrosense-e00de-default-rtdb.firebaseio.com"
 #define FIREBASE_AUTH   "o0NuQDXEJgQN35H9EiGaLanAhzahO7hlIcgnsX4h"
 
