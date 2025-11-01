@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AgroSense — AI Diagnosis</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>AgroSense</h1>
+    <div><a href="dashboard.html">Back</a></div>
+  </header>
+
+  <main class="container">
+    <div class="card">
+      <h3>AI Diagnosis (Prototype)</h3>
+      <p>Upload an image from your crop to get a diagnosis (demo mode uses filename).</p>
+      <input id="fileInput" type="file" accept="image/*" />
+      <button id="uploadBtn">Upload & Diagnose</button>
+
+      <div id="aiResult" class="muted"></div>
+    </div>
+  </main>
+
+  <script>
+    const BACKEND = localStorage.getItem('agro_backend') || 'http://127.0.0.1:5000';
+    document.getElementById('uploadBtn').addEventListener('click', async () => {
+      const file = document.getElementById('fileInput').files[0];
+      if (!file) return alert('Choose an image first');
+      const fd = new FormData(); fd.append('image', file);
+      const res = await fetch(BACKEND + '/diagnose', { method: 'POST', body: fd });
+      const j = await res.json();
+      document.getElementById('aiResult').innerText = JSON.stringify(j, null, 2);
+    });
+  </script>
+</body>
+</html>

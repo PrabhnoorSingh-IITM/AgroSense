@@ -1,5 +1,7 @@
-Flask
-pyrebase4
-twilio
-requests
+flask
 flask-cors
+flask-sqlalchemy
+python-dotenv
+flask-jwt-extended
+werkzeug
+firebase-admin
