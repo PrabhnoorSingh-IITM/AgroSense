@@ -9,7 +9,7 @@ const firebaseConfig = {
 };
 
 // This is the URL of your Python 'app.py' server
-const BACKEND_URL = 'http://127.0.0.1:5000'; 
+const BACKEND_URL = 'https://agrosense-y9d6.onrender.com';
 
 // --- 2. GLOBAL VARIABLES ---
 let moistureChart = null; // This will hold our chart object
@@ -43,6 +43,10 @@ function initializeApp() {
 
 // --- 4. NEW: FIREBASE & LIVE DATA LOGIC ---
 function setupFirebaseListener() {
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+    const sensorRef = database.ref('sensors/agrosense');
+
     try {
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
