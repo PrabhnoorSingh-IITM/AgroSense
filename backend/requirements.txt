@@ -1,5 +1,4 @@
 Flask
-pyrebase4
+Flask-Cors
+python-dotenv
 twilio
-requests
-flask-cors
