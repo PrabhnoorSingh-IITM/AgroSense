@@ -1,80 +1,76 @@
-// frontend/script.js
-import { database } from "./firebase-init.js";
+// ---------------------
+// Firebase initialization
+// ---------------------
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_AUTH_DOMAIN",
+  databaseURL: "YOUR_DATABASE_URL",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_STORAGE_BUCKET",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
 
-let moistureChart = null;
-const chartLabels = [];
-const chartData = [];
+// Prevent double initialization
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
 
-document.addEventListener("DOMContentLoaded", () => {
-  const moistureEl = document.getElementById("moisture-val");
-  const humidityEl = document.getElementById("humidity-val");
-  const tempEl = document.getElementById("temp-val");
-  const statusText = document.getElementById("status-text");
+const database = firebase.database();
 
-  // Initialize Chart.js
-  const ctx = document.getElementById("moisture-chart").getContext("2d");
-  moistureChart = new Chart(ctx, {
-    type: "line",
-    data: {
-      labels: chartLabels,
-      datasets: [{
-        label: "Soil Moisture (%)",
-        data: chartData,
-        borderColor: "#22C55E",
-        backgroundColor: "rgba(34,197,94,0.1)",
-        borderWidth: 3,
-        tension: 0.3,
-        fill: true,
-        pointRadius: 3
-      }]
-    },
-    options: {
-      scales: {
-        x: { title: { display: true, text: "Time" } },
-        y: { title: { display: true, text: "Moisture (%)" }, min: 0, max: 100 }
-      },
-      plugins: {
-        legend: { display: false }
-      },
-      responsive: true,
-      maintainAspectRatio: false
-    }
-  });
+// ---------------------
+// DOM Elements
+// ---------------------
+const moistureEl = document.getElementById("soil-moisture");
+const humidityEl = document.getElementById("air-humidity");
+const tempEl = document.getElementById("air-temperature");
 
-  // Firebase Listener
-  const sensorRef = database.ref("sensors/agrosense");
-  sensorRef.on("value", (snapshot) => {
-    const data = snapshot.val();
-    if (!data) return;
+// ---------------------
+// Twilio Alert Backend
+// ---------------------
+const BACKEND_URL = "https://your-render-backend-url.onrender.com/send-alert"; // change this
 
-    const moisture = parseFloat(data.soil_moisture || 0);
-    const humidity = parseFloat(data.air_humidity || 0);
-    const temp = parseFloat(data.air_temp || 0);
+async function sendAlert(message) {
+  try {
+    await fetch(BACKEND_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message }),
+    });
+    console.log("📩 Alert sent:", message);
+  } catch (err) {
+    console.error("Failed to send alert:", err);
+  }
+}
 
-    moistureEl.textContent = `${moisture.toFixed(1)}%`;
-    humidityEl.textContent = `${humidity.toFixed(1)}%`;
-    tempEl.textContent = `${temp.toFixed(1)}°C`;
+// ---------------------
+// Realtime Firebase Listener
+// ---------------------
+database.ref("/sensor").on("value", (snapshot) => {
+  const data = snapshot.val();
+  if (!data) return;
 
-    // Update Status
-    if (moisture < 20) {
-      statusText.textContent = "⚠️ Soil too dry! Immediate irrigation needed.";
-      document.getElementById("status-banner").style.background = "#F87171";
-    } else if (humidity > 80) {
-      statusText.textContent = "🌫 High humidity — fungal risk detected.";
-      document.getElementById("status-banner").style.background = "#FBBF24";
-    } else {
-      statusText.textContent = "✅ Field conditions are optimal.";
-      document.getElementById("status-banner").style.background = "#22C55E";
-    }
+  const { soilMoisture, humidity, temperature } = data;
 
-    // Update chart
-    const timeLabel = new Date().toLocaleTimeString();
-    chartLabels.push(timeLabel);
-    chartData.push(moisture);
-    if (chartLabels.length > 10) {
-      chartLabels.shift();
-      chartData.shift();
-    }
-    moistureChart.update();
-  });
+  // Update UI
+  moistureEl.textContent = `${soilMoisture}%`;
+  humidityEl.textContent = `${humidity}%`;
+  tempEl.textContent = `${temperature}°C`;
+
+  // ---------------------
+  // Alert logic thresholds
+  // ---------------------
+  if (soilMoisture < 30) {
+    sendAlert(`⚠️ Low Soil Moisture: ${soilMoisture}% detected. Consider watering.`);
+  }
+
+  if (temperature > 35) {
+    sendAlert(`🔥 High Temperature Alert: ${temperature}°C detected!`);
+  }
+
+  if (humidity < 20) {
+    sendAlert(`💧 Low Humidity Alert: ${humidity}% detected.`);
+  }
 });
+
+console.log("✅ Firebase monitoring started...");
