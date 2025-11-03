@@ -10,7 +10,9 @@
   <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-database.js"></script>
-
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <header class="header">
@@ -23,6 +25,12 @@
       <h2>Field Dashboard</h2>
       <p>Real-time field conditions</p>
 
+      <!-- Status Banner -->
+      <div class="status-banner" id="status-banner">
+        <span id="status-text">Connecting to sensors...</span>
+      </div>
+
+      <!-- Sensor Metrics -->
       <div class="metrics">
         <div class="card">
           <h3>🌱 Soil Moisture</h3>
@@ -36,6 +44,12 @@
           <h3>🌡 Air Temperature</h3>
           <p id="temp-val">--°C</p>
         </div>
+      </div>
+
+      <!-- Live Graph -->
+      <div class="chart-card">
+        <h3>📈 Live Soil Moisture Trend</h3>
+        <canvas id="moisture-chart"></canvas>
       </div>
     </section>
   </main>
