@@ -7,6 +7,7 @@ const firebaseConfig = {
   appId: "1:674846785029:web:9b6860a799cb396678a66c",
   measurementId: "G-3LQWTZK219"
 };
+const database = firebase.database();
 
 // This is the URL of your Python 'app.py' server
 const BACKEND_URL = 'https://agrosense-y9d6.onrender.com';
