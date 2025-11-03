@@ -27,7 +27,7 @@
 #define WIFI_SSID       "Redmi 13 5G"
 #define WIFI_PASSWORD   "0124578369"
 
-// ☁️Firebase Project Configuration
+// Firebase Project Configuration
 #define FIREBASE_HOST   "agrosense-e00de-default-rtdb.firebaseio.com"
 #define FIREBASE_AUTH   "o0NuQDXEJgQN35H9EiGaLanAhzahO7hlIcgnsX4h"
 
