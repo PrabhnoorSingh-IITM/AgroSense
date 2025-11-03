@@ -1,59 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AgroSense - Farmer Dashboard</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-database.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-auth.js"></script>
-</head>
-<body class="light-theme">
-  <header class="header">
-    <h1 class="logo">🌾 AgroSense</h1>
-    <div class="header-controls">
-      <button id="theme-toggle" class="theme-btn">🌞 Light</button>
-      <button id="logout-btn" class="logout-btn">Logout</button>
-    </div>
-  </header>
+    <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgroSense - Farmer Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-auth.js"></script>
+    </head>
+    <body class="light-theme">
+        <header class="header">
+            <h1 class="logo">🌾 AgroSense</h1>
+            <div class="header-controls">
+                <button id="theme-toggle" class="theme-btn">🌞 Light</button>
+                <button id="logout-btn" class="logout-btn">Logout</button>
+            </div>
+        </header>
 
-  <main class="dashboard">
-    <section class="sensor-section">
-      <h2>🌱 Field Dashboard</h2>
-      <p>Real-time field conditions</p>
+    <main class="dashboard">
+        <section class="sensor-section">
+        <h2>🌱 Field Dashboard</h2>
+        <p>Real-time field conditions</p>
 
-      <div class="sensor-card">
-        <h3>Soil Moisture</h3>
-        <p id="moisture-value">--%</p>
-      </div>
+        <div class="sensor-card">
+            <h3>Soil Moisture</h3>
+            <p id="moisture-value">--%</p>
+        </div>
 
-      <div class="sensor-card">
-        <h3>Air Humidity</h3>
-        <p id="humidity-value">--%</p>
-      </div>
+        <div class="sensor-card">
+            <h3>Air Humidity</h3>
+            <p id="humidity-value">--%</p>
+        </div>
 
-      <div class="sensor-card">
-        <h3>Air Temperature</h3>
-        <p id="temperature-value">--°C</p>
-      </div>
-    </section>
+        <div class="sensor-card">
+            <h3>Air Temperature</h3>
+            <p id="temperature-value">--°C</p>
+        </div>
+        </section>
 
-    <section class="settings-section">
-      <h2>⚙️ Settings</h2>
-      <div class="user-info">
-        <p><strong>Farm ID:</strong> <span id="farm-id">--</span></p>
-        <p><strong>Location:</strong> <span id="farm-location">--</span></p>
-        <p><strong>Plan:</strong> <span id="farm-plan">--</span></p>
-      </div>
-    </section>
-  </main>
+        <section class="settings-section">
+        <h2>⚙️ Settings</h2>
+        <div class="user-info">
+            <p><strong>Farm ID:</strong> <span id="farm-id">--</span></p>
+            <p><strong>Location:</strong> <span id="farm-location">--</span></p>
+            <p><strong>Plan:</strong> <span id="farm-plan">--</span></p>
+        </div>
+        </section>
+    </main>
 
-  <footer>
-    <p>© 2025 AgroSense | Powered by Firebase</p>
-  </footer>
+    <footer>
+        <p>© 2025 AgroSense | Powered by Firebase</p>
+    </footer>
 
-  <script src="auth.js"></script>
-  <script src="script.js"></script>
-</body>
+    <script src="auth.js"></script>
+    <script src="script.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-auth.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-database.js"></script>
+        <script src="auth.js"></script>
+        <script src="script.js"></script>
+
+    </body>
 </html>

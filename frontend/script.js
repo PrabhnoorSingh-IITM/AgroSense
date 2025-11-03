@@ -7,75 +7,54 @@ const firebaseConfig = {
   appId: "1:674846785029:web:9b6860a799cb396678a66c",
   measurementId: "G-3LQWTZK219"
 };
-// --- Globals ---
-let moistureChart;
+// Use same initialized Firebase instance
+const database = firebase.database();
 
-// Wait for DOM
-document.addEventListener("DOMContentLoaded", function () {
-  initializeChart();
-  setupRealtimeListener();
-});
+document.addEventListener("DOMContentLoaded", () => {
+  const moistureEl = document.getElementById("moisture-value");
+  const humidityEl = document.getElementById("humidity-value");
+  const tempEl = document.getElementById("temperature-value");
+  const farmIdEl = document.getElementById("farm-id");
+  const farmLocationEl = document.getElementById("farm-location");
+  const farmPlanEl = document.getElementById("farm-plan");
 
-// --- Realtime Firebase Listener ---
-function setupRealtimeListener() {
-  const ref = firebase.database().ref("sensors/agrosense");
-  ref.on("value", (snapshot) => {
-    const data = snapshot.val();
-    if (!data) return;
-    updateUI(data);
-  });
-}
-
-// --- Update UI ---
-function updateUI(data) {
-  const moisture = data.soil_moisture?.toFixed(0) || "--";
-  const humidity = data.air_humidity?.toFixed(0) || "--";
-  const temp = data.air_temp?.toFixed(1) || "--";
-
-  document.getElementById("moisture-val").textContent = `${moisture}%`;
-  document.getElementById("humidity-val").textContent = `${humidity}%`;
-  document.getElementById("temp-val").textContent = `${temp}°C`;
-
-  updateChart(moisture);
-}
-
-// --- Chart.js Setup ---
-function initializeChart() {
-  const ctx = document.getElementById("moisture-chart").getContext("2d");
-  moistureChart = new Chart(ctx, {
-    type: "line",
-    data: {
-      labels: [],
-      datasets: [
-        {
-          label: "Soil Moisture (%)",
-          data: [],
-          borderColor: "#22C55E",
-          backgroundColor: "rgba(34, 197, 94, 0.2)",
-          fill: true,
-          tension: 0.4,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        y: { beginAtZero: true, max: 100 },
-      },
-    },
-  });
-}
-
-function updateChart(value) {
-  const now = new Date().toLocaleTimeString();
-  const chart = moistureChart;
-  if (!chart) return;
-  chart.data.labels.push(now);
-  chart.data.datasets[0].data.push(value);
-  if (chart.data.labels.length > 10) {
-    chart.data.labels.shift();
-    chart.data.datasets[0].data.shift();
+  // THEME TOGGLE
+  const themeToggle = document.getElementById("theme-toggle");
+  if (themeToggle) {
+    themeToggle.addEventListener("click", () => {
+      document.body.classList.toggle("dark-theme");
+      const theme = document.body.classList.contains("dark-theme") ? "Dark" : "Light";
+      themeToggle.textContent = theme;
+    });
   }
-  chart.update();
-}
+
+  // Fetch Live Sensor Data
+  const sensorRef = database.ref("sensors/");
+  sensorRef.on("value", (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+      moistureEl.textContent = data.soilMoisture ? `${data.soilMoisture}%` : "--%";
+      humidityEl.textContent = data.humidity ? `${data.humidity}%` : "--%";
+      tempEl.textContent = data.temperature ? `${data.temperature}°C` : "--°C";
+    } else {
+      console.warn("No sensor data found.");
+    }
+  }, (error) => {
+    console.error("Firebase read error:", error.message);
+  });
+
+  // Fetch User Info
+  firebase.auth().onAuthStateChanged((user) => {
+    if (user) {
+      const userRef = database.ref("users/" + user.uid);
+      userRef.on("value", (snapshot) => {
+        const userData = snapshot.val();
+        if (userData) {
+          farmIdEl.textContent = userData.farmID || "--";
+          farmLocationEl.textContent = userData.location || "--";
+          farmPlanEl.textContent = userData.plan || "--";
+        }
+      });
+    }
+  });
+});
